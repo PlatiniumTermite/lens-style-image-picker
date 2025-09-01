@@ -154,4 +154,4 @@ if __name__ == '__main__':
     available = sum(1 for name in MODEL_NAMES if os.path.exists(os.path.join(MODEL_DIR, name)))
     print(f"Available models: {available}/{len(MODEL_NAMES)}")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -34,50 +35,31 @@ const LensStyleImagePicker = () => {
   
   // Animation values
   const pulseAnim = useRef(new Animated.Value(0)).current;
-  const backgroundAnim = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const rotationAnim = useRef(new Animated.Value(0)).current;
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
-  const particlesAnim = useRef(new Animated.Value(0)).current;
-  const gradientShift = useRef(new Animated.Value(0)).current;
+  const gradientPosition = useRef(new Animated.Value(0)).current;
+  const floatingAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Check backend health on component mount
     checkBackendHealth();
     
-    // Enhanced pulse animation with more fluid movement
+    // Pulse animation for main elements
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 2000,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          duration: 3000,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0,
-          duration: 2000,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          duration: 3000,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Background animation with gradient shift
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(backgroundAnim, {
-          toValue: 1,
-          duration: 10000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-        Animated.timing(backgroundAnim, {
-          toValue: 0,
-          duration: 10000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
         }),
       ])
     ).start();
@@ -87,61 +69,61 @@ const LensStyleImagePicker = () => {
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
-          duration: 3000,
+          duration: 4000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
-          duration: 3000,
+          duration: 4000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ])
     ).start();
 
-    // Particles floating animation
+    // Gradient position animation
     Animated.loop(
-      Animated.timing(particlesAnim, {
+      Animated.timing(gradientPosition, {
         toValue: 1,
         duration: 15000,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: false,
       })
     ).start();
 
-    // Gradient position animation
+    // Floating animation for elements
     Animated.loop(
       Animated.sequence([
-        Animated.timing(gradientShift, {
+        Animated.timing(floatingAnim, {
           toValue: 1,
-          duration: 8000,
+          duration: 6000,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
-        Animated.timing(gradientShift, {
+        Animated.timing(floatingAnim, {
           toValue: 0,
-          duration: 8000,
+          duration: 6000,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ])
     ).start();
   }, []);
 
   const pulseScale = pulseAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.9, 1.1, 0.9]
+    inputRange: [0, 1],
+    outputRange: [1, 1.03]
   });
 
   const pulseOpacity = pulseAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.4, 0.8, 0.4]
+    inputRange: [0, 1],
+    outputRange: [0.9, 1]
   });
 
-  const backgroundInterpolation = backgroundAnim.interpolate({
+  const floatingTranslateY = floatingAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
+    outputRange: [0, -10]
   });
 
   const glowInterpolation = glowAnim.interpolate({
@@ -151,29 +133,24 @@ const LensStyleImagePicker = () => {
 
   const glowColor = glowAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: ['rgba(138, 43, 226, 0.3)', 'rgba(75, 0, 130, 0.6)', 'rgba(138, 43, 226, 0.3)']
+    outputRange: ['rgba(101, 31, 255, 0.2)', 'rgba(101, 31, 255, 0.5)', 'rgba(101, 31, 255, 0.2)']
   });
 
   const rotation = rotationAnim.interpolate({
     inputRange: [-1, 0, 1],
-    outputRange: ['-8deg', '0deg', '8deg']
+    outputRange: ['-5deg', '0deg', '5deg']
   });
 
-  const particlesTranslateY = particlesAnim.interpolate({
+  const gradientPositionInterpolation = gradientPosition.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -100]
-  });
-
-  const gradientPosition = gradientShift.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-width, width]
+    outputRange: ['0%', '100%']
   });
 
   const handleButtonPress = (type) => {
-    // Enhanced button scale animation with bounce effect
+    // Button scale animation with bounce effect
     Animated.sequence([
       Animated.timing(buttonScale, {
-        toValue: 0.9,
+        toValue: 0.95,
         duration: 100,
         useNativeDriver: true,
       }),
@@ -196,7 +173,7 @@ const LensStyleImagePicker = () => {
     setSelectedImage(image);
     setShowImage(true);
     
-    // Enhanced rotation animation with more dynamic movement
+    // Rotation animation when image is selected
     Animated.sequence([
       Animated.spring(rotationAnim, {
         toValue: image.source === 'camera' ? -1 : 1,
@@ -213,20 +190,12 @@ const LensStyleImagePicker = () => {
       }),
     ]).start();
 
-    // Enhanced fade in animation with slight scaling
-    Animated.parallel([
-      Animated.timing(imageOpacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(pulseAnim, {
-        toValue: 1,
-        tension: 10,
-        friction: 3,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Fade in animation for the image
+    Animated.timing(imageOpacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
   };
 
   const openCamera = async () => {
@@ -304,210 +273,71 @@ const LensStyleImagePicker = () => {
     }
   };
 
-  const renderParticles = () => {
-    return Array.from({ length: 20 }).map((_, index) => {
-      const size = Math.random() * 8 + 2;
-      const animValue = new Animated.Value(0);
-      
-      // Individual particle animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animValue, {
-            toValue: 1,
-            duration: 3000 + Math.random() * 4000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-            delay: index * 200,
-          }),
-          Animated.timing(animValue, {
-            toValue: 0,
-            duration: 3000 + Math.random() * 4000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-      
-      const opacity = animValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.1, 0.4]
-      });
-      
-      const translateY = animValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, -50 - Math.random() * 100]
-      });
-      
-      const translateX = animValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, (Math.random() - 0.5) * 100]
-      });
-      
-      return (
-        <Animated.View
-          key={index}
-          style={[
-            styles.particle,
-            {
-              top: Math.random() * height,
-              left: Math.random() * width,
-              width: size,
-              height: size,
-              opacity,
-              transform: [{ translateY }, { translateX }],
-              backgroundColor: index % 3 === 0 
-                ? 'rgba(138, 43, 226, 0.6)' 
-                : index % 3 === 1 
-                  ? 'rgba(0, 0, 255, 0.6)' 
-                  : 'rgba(255, 255, 255, 0.4)',
-            },
-          ]}
-        />
-      );
-    });
-  };
-
-  const renderRings = () => {
-    return Array.from({ length: 4 }).map((_, index) => {
-      const size = 340 - index * 30;
-      const delay = index * 400;
-      
-      // Individual ring animation
-      const ringAnim = new Animated.Value(0);
-      
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(ringAnim, {
-            toValue: 1,
-            duration: 3000 + index * 1000,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-            delay,
-          }),
-          Animated.timing(ringAnim, {
-            toValue: 0,
-            duration: 3000 + index * 1000,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-      
-      const ringScale = ringAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.8, 1.2]
-      });
-      
-      const ringOpacity = ringAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.2, 0.6]
-      });
-      
-      return (
-        <Animated.View
-          key={index}
-          style={[
-            styles.ring,
-            {
-              width: size,
-              height: size,
-              borderWidth: index === 0 ? 3 : index === 1 ? 2 : 1,
-              opacity: ringOpacity,
-              transform: [{ scale: ringScale }],
-              borderColor: index % 2 === 0 
-                ? 'rgba(138, 43, 226, 0.6)' 
-                : 'rgba(0, 0, 255, 0.6)',
-            },
-          ]}
-        />
-      );
-    });
-  };
-
   return (
     <View style={styles.container}>
-      {/* Enhanced Background Gradient with Animation */}
-      <Animated.View
+      {/* Animated Background Gradient */}
+      <LinearGradient
+        colors={['#0F0B21', '#1E0F40', '#0F0B21']}
+        start={[0, 0]}
+        end={[1, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* Animated Gradient Overlay */}
+      <Animated.View 
         style={[
           StyleSheet.absoluteFill,
           {
-            transform: [
-              {
-                rotate: backgroundInterpolation,
-              },
-            ],
-          },
+            opacity: 0.3,
+            left: gradientPositionInterpolation
+          }
         ]}
       >
         <LinearGradient
-          colors={['rgba(0, 0, 100, 0.9)', 'rgba(75, 0, 130, 0.9)', 'rgba(0, 0, 50, 1)']}
+          colors={['transparent', 'rgba(101, 31, 255, 0.3)', 'transparent']}
           start={[0, 0]}
-          end={[1, 1]}
+          end={[1, 0]}
           style={StyleSheet.absoluteFill}
         />
-        
-        {/* Animated Gradient Overlay */}
-        <Animated.View 
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              opacity: 0.3,
-              transform: [{
-                translateX: gradientPosition
-              }]
-            }
-          ]}
-        >
-          <LinearGradient
-            colors={['transparent', 'rgba(138, 43, 226, 0.4)', 'transparent']}
-            start={[0, 0]}
-            end={[1, 0]}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
       </Animated.View>
-
-      {/* Enhanced Particles */}
-      {renderParticles()}
 
       {/* Confetti */}
       {showConfetti && (
         <ConfettiCannon
-          count={300}
+          count={200}
           origin={{ x: width / 2, y: -100 }}
           explosionSpeed={400}
           fallSpeed={3500}
-          colors={['#4b0082', '#0000ff', '#8a2be2', '#9370db', '#7b68ee', '#6a5acd']}
+          colors={['#651FFF', '#8C6BFF', '#4A1FC8', '#371A9C']}
           fadeOut={true}
         />
       )}
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Title with subtle animation */}
+        {/* Title with floating animation */}
         <Animated.Text 
           style={[
             styles.title,
             {
-              opacity: pulseAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.9, 1]
-              }),
-              transform: [{
-                translateY: pulseAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 3]
-                })
-              }]
+              opacity: pulseOpacity,
+              transform: [{ translateY: floatingTranslateY }]
             }
           ]}
         >
-          Choose Image
+          Style Lens
         </Animated.Text>
 
-        {/* Image Container with Enhanced Rings and Glow */}
-        <View style={styles.imageContainer}>
-          {renderRings()}
-          
+        <Text style={styles.subtitle}>Upload an image to analyze its style</Text>
+
+        {/* Image Container with Glow Effect */}
+        <Animated.View 
+          style={[
+            styles.imageContainer,
+            {
+              transform: [{ translateY: floatingTranslateY }]
+            }
+          ]}
+        >
           {/* Glow effect */}
           <Animated.View
             style={[
@@ -515,7 +345,6 @@ const LensStyleImagePicker = () => {
               {
                 opacity: glowInterpolation,
                 backgroundColor: glowColor,
-                transform: [{ scale: pulseScale }]
               }
             ]}
           />
@@ -526,10 +355,6 @@ const LensStyleImagePicker = () => {
               {
                 opacity: imageOpacity,
                 transform: [{ rotate: rotation }, { scale: pulseScale }],
-                shadowOpacity: glowInterpolation,
-                shadowRadius: 20,
-                shadowColor: '#8a2be2',
-                shadowOffset: { width: 0, height: 0 },
               },
             ]}
           >
@@ -540,21 +365,20 @@ const LensStyleImagePicker = () => {
               />
             ) : (
               <View style={styles.placeholder}>
-                <Text style={styles.placeholderIcon}>📷</Text>
+                <Animated.Text style={[styles.placeholderIcon, { transform: [{ translateY: floatingTranslateY }] }]}>
+                  📷
+                </Animated.Text>
                 <Text style={styles.placeholderText}>No Image Selected</Text>
               </View>
             )}
           </Animated.View>
-        </View>
+        </Animated.View>
 
-        {/* Buttons with enhanced animations */}
+        {/* Buttons with animations */}
         <View style={styles.buttonsContainer}>
           <Animated.View style={{ 
-            transform: [{ scale: buttonScale }],
-            opacity: pulseAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.9, 1]
-            })
+            transform: [{ scale: buttonScale }, { translateY: floatingTranslateY }],
+            opacity: pulseOpacity
           }}>
             <TouchableOpacity
               style={[styles.button, styles.cameraButton]}
@@ -562,21 +386,18 @@ const LensStyleImagePicker = () => {
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={['rgba(0, 0, 255, 0.8)', 'rgba(75, 0, 130, 0.9)']}
+                colors={['#651FFF', '#4A1FC8']}
                 start={[0, 0]}
                 end={[1, 1]}
-                style={StyleSheet.absoluteFill}
+                style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
               />
               <Text style={styles.buttonText}>📷 Open Camera</Text>
             </TouchableOpacity>
           </Animated.View>
 
           <Animated.View style={{ 
-            transform: [{ scale: buttonScale }],
-            opacity: pulseAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.9, 1]
-            })
+            transform: [{ scale: buttonScale }, { translateY: floatingTranslateY }],
+            opacity: pulseOpacity
           }}>
             <TouchableOpacity
               style={[styles.button, styles.galleryButton]}
@@ -584,27 +405,24 @@ const LensStyleImagePicker = () => {
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={['rgba(128, 0, 128, 0.8)', 'rgba(75, 0, 130, 0.9)']}
+                colors={['#8C6BFF', '#651FFF']}
                 start={[0, 0]}
                 end={[1, 1]}
-                style={StyleSheet.absoluteFill}
+                style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
               />
               <Text style={styles.buttonText}>🖼️ Choose from Gallery</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
 
-        {/* Proceed Button with enhanced animation */}
+        {/* Proceed Button */}
         {selectedImage && (
           <Animated.View
             style={[
               styles.proceedContainer,
               {
-                transform: [{ scale: buttonScale }],
-                opacity: pulseAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1]
-                })
+                transform: [{ scale: buttonScale }, { translateY: floatingTranslateY }],
+                opacity: pulseOpacity
               },
             ]}
           >
@@ -612,53 +430,80 @@ const LensStyleImagePicker = () => {
               style={styles.proceedButton}
               onPress={handleProceed}
               activeOpacity={0.7}
+              disabled={isLoading}
             >
               <LinearGradient
-                colors={['rgba(0, 128, 0, 0.8)', 'rgba(0, 100, 0, 0.9)']}
+                colors={['#00C853', '#009624']}
                 start={[0, 0]}
                 end={[1, 1]}
                 style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
               />
-              <Text style={styles.proceedButtonText}>Proceed →</Text>
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.proceedButtonText}>Analyze Style →</Text>
+              )}
             </TouchableOpacity>
           </Animated.View>
         )}
+
+        {/* Backend Status Indicator */}
+        <View style={styles.statusContainer}>
+          <View style={[
+            styles.statusIndicator, 
+            { backgroundColor: backendStatus === 'connected' ? '#4CAF50' : backendStatus === 'checking' ? '#FFC107' : '#F44336' }
+          ]} />
+          <Text style={styles.statusText}>
+            {backendStatus === 'connected' ? 'Connected to ML Service' : 
+             backendStatus === 'checking' ? 'Checking connection...' : 
+             'Connection failed. Please check your network.'}
+          </Text>
+        </View>
       </ScrollView>
 
       {/* Camera Modal */}
       <Modal visible={isCameraVisible} animationType="slide">
         <View style={styles.modalContainer}>
           <Camera style={StyleSheet.absoluteFill} />
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={openCamera}
-          >
-            <Text style={styles.captureButtonText}>Capture</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setIsCameraVisible(false)}
-          >
-            <Text style={styles.closeButtonText}>×</Text>
-          </TouchableOpacity>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={openCamera}
+            >
+              <View style={styles.captureButtonInner} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setIsCameraVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
       {/* Gallery Modal */}
       <Modal visible={isGalleryVisible} animationType="slide">
         <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.galleryButtonModal}
-            onPress={openGallery}
-          >
-            <Text style={styles.galleryButtonText}>Select from Gallery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setIsGalleryVisible(false)}
-          >
-            <Text style={styles.closeButtonText}>×</Text>
-          </TouchableOpacity>
+          <LinearGradient
+            colors={['#0F0B21', '#1E0F40']}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select from Gallery</Text>
+            <TouchableOpacity
+              style={styles.galleryButtonModal}
+              onPress={openGallery}
+            >
+              <Text style={styles.galleryButtonText}>Choose Image</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setIsGalleryVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -668,7 +513,7 @@ const LensStyleImagePicker = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0F0B21',
     overflow: 'hidden',
   },
   content: {
@@ -678,13 +523,17 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   title: {
-    fontSize: 38,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '800',
     color: 'white',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 40,
-    textShadowColor: 'rgba(138, 43, 226, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+    textAlign: 'center',
   },
   imageContainer: {
     alignItems: 'center',
@@ -694,39 +543,34 @@ const styles = StyleSheet.create({
   },
   glowEffect: {
     position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-  },
-  ring: {
-    position: 'absolute',
-    borderRadius: 200,
-    borderWidth: 1,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
   },
   imageWrapper: {
-    width: 280,
-    height: 280,
-    borderRadius: 24,
+    width: 260,
+    height: 260,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 2,
-    borderColor: 'rgba(138, 43, 226, 0.3)',
-    elevation: 10,
-    shadowColor: '#8a2be2',
+    borderColor: 'rgba(101, 31, 255, 0.3)',
+    elevation: 8,
+    shadowColor: '#651FFF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
   },
   selectedImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 20,
   },
   placeholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     borderStyle: 'dashed',
@@ -738,108 +582,134 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   placeholderText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 16,
   },
   buttonsContainer: {
     width: '100%',
-    gap: 20,
-    paddingHorizontal: 30,
+    gap: 16,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   button: {
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 5,
     overflow: 'hidden',
   },
-  cameraButton: {
-    backgroundColor: 'transparent',
-  },
-  galleryButton: {
-    backgroundColor: 'transparent',
-  },
   buttonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   proceedContainer: {
     width: '100%',
-    paddingHorizontal: 40,
-    marginTop: 20,
-    marginBottom: 50,
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
   proceedButton: {
-    backgroundColor: 'transparent',
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 5,
     overflow: 'hidden',
   },
   proceedButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  particle: {
-    position: 'absolute',
-    borderRadius: 10,
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  statusText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
   },
   modalContainer: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  modalContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 30,
+  },
+  modalButtons: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captureButton: {
-    position: 'absolute',
-    bottom: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 20,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  captureButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
   },
   galleryButtonModal: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 20,
-    borderRadius: 30,
+    backgroundColor: 'rgba(101, 31, 255, 0.9)',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
   },
   galleryButtonText: {
+    color: 'white',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  closeButton: {
+  closeModalButton: {
     position: 'absolute',
     top: 50,
     right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeButtonText: {
-    fontSize: 24,
+  closeModalButtonText: {
+    color: 'white',
+    fontSize: 20,
     fontWeight: 'bold',
   },
 });

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000'; // Change this to your backend URL
+const API_BASE_URL = 'http://localhost:5001'; // Change this to your backend URL
 
 class MLService {
   static async uploadImageForPrediction(imageUri) {

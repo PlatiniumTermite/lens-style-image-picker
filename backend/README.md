@@ -43,6 +43,14 @@ The server will start on `http://localhost:5000`
 - **GET** `/models/status`
 - Check which ML models are available
 
+## Model Setup Instructions
+The backend expects 5 trained ML models in the `models/` directory:
+- `dt_model.joblib` - Decision Tree Classifier
+- `lr_model.joblib` - Logistic Regression
+- `nb_model.joblib` - Naive Bayes
+- `rf_model.joblib` - Random Forest Classifier  
+- `svm_model.joblib` - Support Vector Machine
+
 ## Frontend Integration
 
 The React Native app automatically connects to the backend when you:
