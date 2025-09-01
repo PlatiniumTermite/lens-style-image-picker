@@ -8,6 +8,7 @@ yarn-error.log*
 .expo/
 dist/
 web-build/
+wnode_modules/
 
 # Native
 *.orig.*
