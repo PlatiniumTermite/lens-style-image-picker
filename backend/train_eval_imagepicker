@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+\"\"\"train_eval_imagepicker.py
+Transfer-learning training and evaluation helper for Lens-Style Image Picker.
+Supports: resnet50, mobilenet_v3_large, efficientnet_b0, vit_b_16 (via torchvision or timm)
+Usage examples:
+  python train_eval_imagepicker.py --data-dir ./data --model resnet50 --epochs 5 --batch-size 32
+  python train_eval_imagepicker.py --data-dir ./data --model vit_b_16 --evaluate_only --checkpoint ./ckpt.pth
+\"\"\"
+
+import os
+import argparse
+from pathlib import Path
+import json
+import time
+import copy
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms, models
+
+try:
+    import timm
+    TIMM_AVAILABLE = True
+except Exception:
+    TIMM_AVAILABLE = False
+
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import numpy as np
+
+def get_model(name, num_classes, pretrained=True):
+    name = name.lower()
+    if name == 'resnet50':
+        model = models.resnet50(pretrained=pretrained)
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, num_classes)
+        return model
+    if name == 'mobilenet_v3_large' or name == 'mobilenetv3':
+        model = models.mobilenet_v3_large(pretrained=pretrained)
+        in_features = model.classifier[3].in_features if hasattr(model, 'classifier') else model.classifier[-1].in_features
+        # Replace classifier
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=0.2, inplace=True),
+            nn.Linear(in_features, num_classes),
+        )
+        return model
+    if name == 'efficientnet_b0' or name == 'efficientnet':
+        try:
+            model = models.efficientnet_b0(pretrained=pretrained)
+            in_features = model.classifier[1].in_features
+            model.classifier[1] = nn.Linear(in_features, num_classes)
+            return model
+        except Exception:
+            # fallback to timm
+            pass
+    if name.startswith('vit') or name.startswith('visiontransformer') or name == 'vit_b_16':
+        # torchvision has vit_b_16 in newer releases; otherwise use timm
+        try:
+            model = models.vit_b_16(pretrained=pretrained)
+            in_features = model.heads.head.in_features if hasattr(model, 'heads') else model.heads.in_features
+            # replace head
+            model.heads = nn.Linear(in_features, num_classes)
+            return model
+        except Exception:
+            pass
+    # fallback to timm if available
+    if TIMM_AVAILABLE:
+        # try to use timm model name mapping
+        timm_name = None
+        mapping = {
+            'resnet50': 'resnet50',
+            'mobilenet_v3_large': 'mobilenetv3_100',
+            'efficientnet_b0': 'efficientnet_b0',
+            'vit_b_16': 'vit_base_patch16_224',
+        }
+        if name in mapping:
+            timm_name = mapping[name]
+        else:
+            timm_name = name
+        try:
+            model = timm.create_model(timm_name, pretrained=pretrained, num_classes=num_classes)
+            return model
+        except Exception as e:
+            print('timm model load failed:', e)
+    raise ValueError(f'Model {name} not available. Install timm or use a supported torchvision model.')
+
+def build_dataloaders(data_dir, img_size=224, batch_size=32, num_workers=4):
+    data_dir = Path(data_dir)
+    train_dir = data_dir / 'train'
+    val_dir = data_dir / 'val'
+    if not train_dir.exists() or not val_dir.exists():
+        raise FileNotFoundError(f'Expected train/ and val/ folders under {data_dir}')
+
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(img_size),
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.02),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    val_transform = transforms.Compose([
+        transforms.Resize(int(img_size*1.14)),
+        transforms.CenterCrop(img_size),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+    train_dataset = datasets.ImageFolder(str(train_dir), transform=train_transform)
+    val_dataset = datasets.ImageFolder(str(val_dir), transform=val_transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    class_to_idx = train_dataset.class_to_idx
+    idx_to_class = {v:k for k,v in class_to_idx.items()}
+
+    return train_loader, val_loader, idx_to_class
+
+def train_model(model, dataloaders, device, criterion, optimizer, scheduler, num_epochs=5, save_dir='./ckpts'):
+    since = time.time()
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_acc = 0.0
+    train_loader, val_loader = dataloaders
+
+    history = {'epoch': [], 'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
+
+    for epoch in range(num_epochs):
+        print(f'Epoch {epoch+1}/{num_epochs}')
+        # training
+        model.train()
+        running_loss = 0.0
+        running_corrects = 0
+        total = 0
+        for inputs, labels in train_loader:
+            inputs = inputs.to(device); labels = labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            if isinstance(outputs, tuple): outputs = outputs[0]
+            _, preds = torch.max(outputs, 1)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels.data).item()
+            total += inputs.size(0)
+
+        epoch_loss = running_loss / total
+        epoch_acc = running_corrects / total
+        print(f'Train Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+
+        # validation
+        model.eval()
+        val_loss = 0.0
+        val_corrects = 0
+        val_total = 0
+        all_preds = []
+        all_labels = []
+
+        with torch.no_grad():
+            for inputs, labels in val_loader:
+                inputs = inputs.to(device); labels = labels.to(device)
+                outputs = model(inputs)
+                if isinstance(outputs, tuple): outputs = outputs[0]
+                _, preds = torch.max(outputs, 1)
+                loss = criterion(outputs, labels)
+
+                val_loss += loss.item() * inputs.size(0)
+                val_corrects += torch.sum(preds == labels.data).item()
+                val_total += inputs.size(0)
+
+                all_preds.extend(preds.cpu().numpy().tolist())
+                all_labels.extend(labels.cpu().numpy().tolist())
+
+        val_epoch_loss = val_loss / val_total
+        val_epoch_acc = val_corrects / val_total
+        print(f'Val Loss: {val_epoch_loss:.4f} Acc: {val_epoch_acc:.4f}')
+
+        history['epoch'].append(epoch+1)
+        history['train_loss'].append(epoch_loss)
+        history['train_acc'].append(epoch_acc)
+        history['val_loss'].append(val_epoch_loss)
+        history['val_acc'].append(val_epoch_acc)
+
+        # scheduler step
+        if scheduler is not None:
+            scheduler.step(val_epoch_loss)
+
+        # deep copy best model
+        if val_epoch_acc > best_acc:
+            best_acc = val_epoch_acc
+            best_model_wts = copy.deepcopy(model.state_dict())
+            os.makedirs(save_dir, exist_ok=True)
+            ckpt_path = os.path.join(save_dir, f'best_{int(time.time())}.pth')
+            torch.save({'model_state_dict': best_model_wts, 'idx_to_class': dataloaders[2]}, ckpt_path)
+            print('Saved best checkpoint to', ckpt_path)
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+
+    # load best weights
+    model.load_state_dict(best_model_wts)
+    return model, history
+
+def evaluate_model(model, dataloader, device, idx_to_class, save_dir='./results', checkpoint_info=None):
+    model.eval()
+    preds = []
+    labels = []
+    filenames = []
+
+    with torch.no_grad():
+        for inputs, labs in dataloader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            if isinstance(outputs, tuple): outputs = outputs[0]
+            _, p = torch.max(outputs, 1)
+            preds.extend(p.cpu().numpy().tolist())
+            labels.extend(labs.numpy().tolist())
+
+    y_true = np.array(labels)
+    y_pred = np.array(preds)
+    acc = accuracy_score(y_true, y_pred)
+    report = classification_report(y_true, y_pred, target_names=[idx_to_class[i] for i in sorted(idx_to_class.keys())], digits=4)
+    cm = confusion_matrix(y_true, y_pred)
+
+    os.makedirs(save_dir, exist_ok=True)
+    # save report & confusion matrix
+    timestamp = int(time.time())
+    with open(os.path.join(save_dir, f'report_{timestamp}.txt'), 'w') as f:
+        f.write(f'Accuracy: {acc:.4f}\n\n')
+        f.write(report)
+        f.write('\n\nConfusion Matrix:\n')
+        np.savetxt(f, cm, fmt='%d')
+
+    # also save as json summary
+    summary = {'accuracy': float(acc), 'report': report, 'confusion_matrix_shape': list(cm.shape)}
+    with open(os.path.join(save_dir, f'summary_{timestamp}.json'), 'w') as f:
+        json.dump(summary, f, indent=2)
+
+    print('Evaluation Accuracy:', acc)
+    print('Classification report:')
+    print(report)
+    print('Confusion matrix shape:', cm.shape)
+    if checkpoint_info:
+        print('Evaluated checkpoint:', checkpoint_info)
+
+    return acc, report, cm
+
+def parse_args():
+    p = argparse.ArgumentParser(description='Train/eval transfer learning for image picker')
+    p.add_argument('--data-dir', required=True, help='Path to dataset dir containing train/ and val/ folders')
+    p.add_argument('--model', default='resnet50', choices=['resnet50', 'mobilenet_v3_large', 'efficientnet_b0', 'vit_b_16'], help='Model name')
+    p.add_argument('--epochs', type=int, default=5)
+    p.add_argument('--batch-size', type=int, default=32)
+    p.add_argument('--img-size', type=int, default=224)
+    p.add_argument('--lr', type=float, default=1e-4)
+    p.add_argument('--num-workers', type=int, default=4)
+    p.add_argument('--save-dir', default='./ckpts')
+    p.add_argument('--evaluate_only', action='store_true')
+    p.add_argument('--checkpoint', default=None, help='Path to checkpoint to load for evaluation or fine-tuning')
+    p.add_argument('--no-cuda', action='store_true', help='Disable CUDA')
+    return p.parse_args()
+
+def main():
+    args = parse_args()
+    device = torch.device('cuda' if torch.cuda.is_available() and not args.no_cuda else 'cpu')
+    print('Using device:', device)
+
+    train_loader, val_loader, idx_to_class = build_dataloaders(args.data_dir, img_size=args.img_size, batch_size=args.batch_size, num_workers=args.num_workers)
+    num_classes = len(idx_to_class)
+    print('Found classes:', num_classes, idx_to_class)
+
+    model = get_model(args.model, num_classes, pretrained=True)
+    model = model.to(device)
+
+    # Optionally load checkpoint
+    if args.checkpoint and os.path.exists(args.checkpoint):
+        ckpt = torch.load(args.checkpoint, map_location=device)
+        if 'model_state_dict' in ckpt:
+            model.load_state_dict(ckpt['model_state_dict'])
+            print('Loaded model_state_dict from checkpoint')
+        else:
+            model.load_state_dict(ckpt)
+            print('Loaded model weights from checkpoint')
+
+    if args.evaluate_only:
+        print('Running evaluation only...')
+        evaluate_model(model, val_loader, device, idx_to_class, save_dir=args.save_dir, checkpoint_info=args.checkpoint)
+        return
+
+    # Freeze backbone except classifier for quick checks (optional)
+    for name, param in model.named_parameters():
+        if 'fc' in name or 'classifier' in name or 'head' in name or 'heads' in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = True  # You can set False to freeze for very quick checks
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
+
+    # Train
+    trained_model, history = train_model(model, (train_loader, val_loader, idx_to_class), device, criterion, optimizer, scheduler, num_epochs=args.epochs, save_dir=args.save_dir)
+
+    # Evaluate final
+    evaluate_model(trained_model, val_loader, device, idx_to_class, save_dir=args.save_dir, checkpoint_info=None)
+
+if __name__ == '__main__':
+    main()
