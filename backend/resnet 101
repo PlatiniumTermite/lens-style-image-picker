@@ -1,0 +1,83 @@
+"""
+resnet101_full_pipeline.py
+
+Full ResNet-101 training + inference + export + FastAPI serving pipeline (PyTorch).
+Designed for an image-picker app with ~79 classes (multi-label/multi-class configurable).
+
+Features included:
+- Dataset class with image transforms
+- DataLoaders (train/val/test)
+- Pretrained ResNet-101 backbone with configurable classifier (single-label or multi-label)
+- Training loop with mixed precision, scheduler, and checkpointing
+- Validation & metrics (accuracy, precision, recall, f1 for multi-class and multi-label)
+- Inference helper
+- ONNX export and example of quantization-ready export
+- FastAPI server with /predict endpoint accepting multipart image uploads and returning JSON predictions
+
+Requirements:
+- Python 3.8+
+- torch, torchvision
+- timm (optional, for other backbones)
+- Pillow, tqdm, numpy, scikit-learn
+- fastapi, uvicorn, python-multipart
+
+Note: Adjust paths, hyperparameters, and num_classes to your use-case.
+
+"""
+
+import os
+import argparse
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict
+
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms, models
+
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+# Optional import for nicer models (uncomment if installed)
+# import timm
+
+# -----------------------------
+# Configuration
+# -----------------------------
+DEFAULT_NUM_CLASSES = 79 # adjust if you want a different number of classes
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# -----------------------------
+# Dataset
+# -----------------------------
+class ImageFolderCSV(Dataset):
+"""
+Custom dataset that reads lines of CSV: image_path, label1|label2|... (for multi-label)
+or image_path,label (for single-label).
+
+label_mode: 'single' or 'multi'
+"""
+def __init__(self, csv_file: str, root_dir: str = "", transform=None, label_mode: str = 'single', class_map: Optional[Dict[str,int]] = None):
+import csv
+self.root_dir = root_dir
+self.transform = transform
+self.label_mode = label_mode
+self.samples = [] # list of (image_path, labels)
+self.class_map = class_map
+
+with open(csv_file, 'r', encoding='utf-8') as f:
+reader = csv.reader(f)
+for row in reader:
+if len(row) < 2:
+continue
+img_path = row[0].strip()
+label_raw = row[1].strip()
+if label_mode == 'single':
+label = int(label_raw)
+else:
+# assume pipe-separated names or ints like 1|3|5
+parts = [p.strip() for p in label_raw.split('|') if p.strip()]
